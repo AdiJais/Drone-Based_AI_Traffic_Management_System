@@ -1,0 +1,1903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AeroSignal — Drone Traffic Command</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111418;
+    --surface2: #181c22;
+    --surface3: #1e2430;
+    --border: rgba(255,255,255,0.07);
+    --border-bright: rgba(255,255,255,0.15);
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --green: #22c55e;
+    --green-dim: rgba(34,197,94,0.15);
+    --green-glow: rgba(34,197,94,0.3);
+    --yellow: #eab308;
+    --yellow-dim: rgba(234,179,8,0.15);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.15);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59,130,246,0.15);
+    --cyan: #06b6d4;
+    --cyan-dim: rgba(6,182,212,0.12);
+    --orange: #f97316;
+    --font-display: 'Syne', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font-mono); font-size: 13px; min-height: 100vh; overflow-x: hidden; }
+  body::before { content:''; position:fixed; inset:0; background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.04) 2px,rgba(0,0,0,0.04) 4px); pointer-events:none; z-index:9999; }
+
+  /* HEADER */
+  header { display:flex; align-items:center; justify-content:space-between; padding:14px 28px; border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:100; }
+  .logo { display:flex; align-items:center; gap:12px; }
+  .logo-icon { width:32px; height:32px; background:var(--green); border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:16px; }
+  .logo-text { font-family:var(--font-display); font-weight:800; font-size:20px; letter-spacing:-0.5px; }
+  .logo-text span { color:var(--green); }
+  .header-status { display:flex; align-items:center; gap:16px; }
+  .status-pill { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; }
+  .pulse-dot { width:7px; height:7px; border-radius:50%; background:var(--green); animation:pulse-anim 2s infinite; }
+  .pulse-dot.red { background:var(--red); }
+  @keyframes pulse-anim { 0%,100%{opacity:1;box-shadow:0 0 0 0 var(--green-glow);} 50%{opacity:0.7;box-shadow:0 0 0 6px transparent;} }
+  .nav-tabs { display:flex; gap:2px; background:var(--surface2); padding:3px; border-radius:8px; }
+  .nav-tab { padding:6px 16px; border-radius:6px; cursor:pointer; font-size:12px; color:var(--muted); border:none; background:transparent; font-family:var(--font-mono); transition:all 0.2s; letter-spacing:0.5px; }
+  .nav-tab.active { background:var(--surface3); color:var(--text); }
+  .nav-tab:hover:not(.active) { color:var(--text); }
+  .mode-btn { padding:5px 12px; background:var(--surface3); border:1px solid var(--border); border-radius:6px; color:var(--muted); font-family:var(--font-mono); font-size:11px; cursor:pointer; transition:all 0.2s; }
+  .mode-btn.active { background:var(--green-dim); color:var(--green); border-color:rgba(34,197,94,0.4); }
+  .mode-btn:hover:not(.active) { color:var(--text); }
+
+  /* LAYOUT */
+  .main { display:none; padding:24px 28px; max-width:1600px; margin:0 auto; }
+  .main.active { display:block; }
+  .section-label { font-size:10px; text-transform:uppercase; letter-spacing:2px; color:var(--muted); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+  .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+
+  /* CARDS */
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px 20px; margin-bottom:20px; }
+  .card-title { font-family:var(--font-display); font-weight:700; font-size:14px; color:var(--text); margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .badge { font-family:var(--font-mono); font-size:10px; padding:3px 8px; border-radius:4px; text-transform:uppercase; letter-spacing:0.5px; white-space:nowrap; }
+  .badge-green { background:var(--green-dim); color:var(--green); }
+  .badge-yellow { background:var(--yellow-dim); color:var(--yellow); }
+  .badge-red { background:var(--red-dim); color:var(--red); }
+  .badge-blue { background:var(--blue-dim); color:var(--blue); }
+  .badge-cyan { background:var(--cyan-dim); color:var(--cyan); }
+
+  /* STAT GRID */
+  .stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+  .stat-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px 18px; position:relative; overflow:hidden; }
+  .stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; border-radius:10px 10px 0 0; }
+  .stat-card.green::before { background:var(--green); }
+  .stat-card.yellow::before { background:var(--yellow); }
+  .stat-card.blue::before { background:var(--blue); }
+  .stat-card.cyan::before { background:var(--cyan); }
+  .stat-card.red::before { background:var(--red); }
+  .stat-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:8px; }
+  .stat-value { font-family:var(--font-display); font-size:32px; font-weight:800; line-height:1; margin-bottom:4px; }
+  .stat-value.green { color:var(--green); }
+  .stat-value.yellow { color:var(--yellow); }
+  .stat-value.blue { color:var(--blue); }
+  .stat-value.cyan { color:var(--cyan); }
+  .stat-value.red { color:var(--red); }
+  .stat-sub { font-size:11px; color:var(--muted); }
+
+  /* GRIDS */
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:20px; }
+  .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; margin-bottom:20px; }
+  .grid-left-heavy { display:grid; grid-template-columns:2fr 1fr; gap:20px; margin-bottom:20px; }
+
+  /* LANE SIGNALS */
+  .lanes-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .lane-card { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:14px; text-align:center; transition:border-color 0.3s, box-shadow 0.3s; cursor:pointer; position:relative; }
+  .lane-card.active-green { border-color:var(--green); box-shadow:0 0 20px var(--green-glow); }
+  .lane-card.active-yellow { border-color:var(--yellow); box-shadow:0 0 20px rgba(234,179,8,0.3); }
+  .lane-name { font-family:var(--font-display); font-weight:700; font-size:13px; margin-bottom:10px; color:var(--muted); }
+  .lane-card.active-green .lane-name,.lane-card.active-yellow .lane-name { color:var(--text); }
+  .traffic-light { display:flex; flex-direction:column; align-items:center; gap:5px; background:#0d0f12; border-radius:20px; padding:8px; width:36px; margin:0 auto 10px; border:1px solid var(--border); }
+  .tl-dot { width:18px; height:18px; border-radius:50%; opacity:0.15; }
+  .tl-red { background:var(--red); }
+  .tl-yellow { background:var(--yellow); }
+  .tl-green { background:var(--green); }
+  .lane-card.active-green .tl-green { opacity:1; box-shadow:0 0 10px var(--green); animation:green-pulse 1.5s ease-in-out infinite; }
+  .lane-card.active-green .tl-red { opacity:0.12; }
+  .lane-card.active-yellow .tl-yellow { opacity:1; box-shadow:0 0 8px var(--yellow); }
+  .lane-card.active-yellow .tl-red { opacity:0.12; }
+  @keyframes green-pulse { 0%,100%{box-shadow:0 0 8px var(--green);} 50%{box-shadow:0 0 16px var(--green),0 0 24px var(--green-dim);} }
+  .lane-vehicles { font-family:var(--font-display); font-weight:700; font-size:22px; margin-bottom:2px; }
+  .lane-sublabel { font-size:10px; color:var(--muted); }
+  .lane-bar { margin-top:8px; height:3px; background:var(--surface3); border-radius:2px; overflow:hidden; }
+  .lane-bar-fill { height:100%; border-radius:2px; background:var(--muted); transition:width 0.8s ease; }
+  .lane-card.active-green .lane-bar-fill { background:var(--green); }
+  .lane-card.active-yellow .lane-bar-fill { background:var(--yellow); }
+  .lane-countdown { font-size:10px; color:var(--muted); margin-top:4px; }
+  .lane-card.active-green .lane-countdown { color:var(--green); }
+
+  /* SIGNAL PHASE INDICATOR */
+  .phase-bar { height:4px; background:var(--surface3); border-radius:2px; overflow:hidden; margin-top:10px; }
+  .phase-bar-fill { height:100%; border-radius:2px; transition:width 1s linear; }
+
+  /* VIDEO FEED */
+  .video-feed { background:var(--surface2); border:1px solid var(--border); border-radius:10px; overflow:hidden; position:relative; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center; }
+  .feed-overlay { position:absolute; inset:0; pointer-events:none; }
+  .feed-corner { position:absolute; width:16px; height:16px; border-color:var(--green); border-style:solid; opacity:0.7; }
+  .feed-corner.tl { top:10px; left:10px; border-width:2px 0 0 2px; }
+  .feed-corner.tr { top:10px; right:10px; border-width:2px 2px 0 0; }
+  .feed-corner.bl { bottom:10px; left:10px; border-width:0 0 2px 2px; }
+  .feed-corner.br { bottom:10px; right:10px; border-width:0 2px 2px 0; }
+  .feed-placeholder { text-align:center; color:var(--muted); }
+  .feed-icon { font-size:48px; margin-bottom:10px; opacity:0.3; }
+  .feed-url-input { background:transparent; border:1px solid var(--border-bright); border-radius:6px; padding:7px 12px; color:var(--text); font-family:var(--font-mono); font-size:12px; width:100%; outline:none; transition:border-color 0.2s; margin-top:8px; }
+  .feed-url-input:focus { border-color:var(--green); }
+  .feed-url-input::placeholder { color:var(--muted); }
+  .connect-btn { background:var(--green); color:#0a0c0f; border:none; border-radius:6px; padding:7px 16px; font-family:var(--font-mono); font-size:12px; font-weight:700; cursor:pointer; margin-top:8px; width:100%; letter-spacing:0.5px; transition:opacity 0.2s; }
+  .connect-btn:hover { opacity:0.85; }
+  .feed-info-bar { position:absolute; bottom:0; left:0; right:0; padding:6px 12px; background:rgba(10,12,15,0.85); display:flex; justify-content:space-between; align-items:center; font-size:10px; color:var(--muted); }
+
+  /* DETECTION OVERLAY ON VIDEO */
+  .det-overlay { position:absolute; inset:0; pointer-events:none; }
+  .det-box { position:absolute; border:2px solid var(--cyan); border-radius:2px; }
+  .det-box.stopped { border-color:var(--red); }
+  .det-label { position:absolute; top:-18px; left:0; font-size:9px; background:rgba(10,12,15,0.85); padding:1px 4px; border-radius:2px; white-space:nowrap; color:var(--cyan); }
+  .det-box.stopped .det-label { color:var(--red); }
+  .det-line { position:absolute; left:0; right:0; height:2px; background:rgba(234,179,8,0.6); top:50%; }
+
+  /* VEHICLE TYPE BREAKDOWN */
+  .vtype-list { display:flex; flex-direction:column; gap:10px; }
+  .vtype-row { display:flex; align-items:center; gap:10px; }
+  .vtype-icon { width:28px; height:28px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+  .vtype-label { font-size:12px; color:var(--muted); flex:1; }
+  .vtype-count { font-family:var(--font-display); font-weight:700; font-size:16px; min-width:28px; text-align:right; }
+  .vtype-bar { flex:2; height:3px; background:var(--surface3); border-radius:2px; overflow:hidden; }
+  .vtype-bar-fill { height:100%; border-radius:2px; transition:width 0.8s ease; }
+
+  /* JAM DETECTION */
+  .jam-meter { margin-bottom:10px; }
+  .jam-bar-wrapper { height:6px; background:var(--surface3); border-radius:3px; overflow:hidden; margin:4px 0; position:relative; }
+  .jam-bar-fill { height:100%; border-radius:3px; transition:width 0.6s ease; background:var(--green); }
+  .jam-bar-fill.warn { background:var(--yellow); }
+  .jam-bar-fill.danger { background:var(--red); animation:jam-flash 0.8s ease infinite; }
+  @keyframes jam-flash { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
+  .jam-threshold-line { position:absolute; top:0; bottom:0; left:75%; width:1px; background:var(--yellow); opacity:0.6; }
+
+  /* ALERT LIST */
+  .alert-list { display:flex; flex-direction:column; gap:4px; max-height:360px; overflow-y:auto; }
+  .alert-item { display:flex; gap:8px; align-items:flex-start; padding:7px 0; border-bottom:1px solid var(--border); }
+  .alert-item:last-child { border-bottom:none; }
+  .alert-indicator { width:6px; height:6px; border-radius:50%; margin-top:4px; flex-shrink:0; }
+  .alert-content { flex:1; }
+  .alert-event { font-size:11px; color:var(--text); line-height:1.4; }
+  .alert-time { font-size:10px; color:var(--muted); margin-top:1px; }
+
+  /* SIGNAL PANEL */
+  .signal-panel { background:var(--surface2); border-radius:8px; padding:12px; display:flex; flex-direction:column; gap:6px; font-size:11px; }
+  .sig-row { display:flex; justify-content:space-between; }
+  .sig-key { color:var(--muted); }
+  .sig-val { font-family:var(--font-display); font-weight:700; }
+  .sig-val.green { color:var(--green); }
+  .sig-val.yellow { color:var(--yellow); }
+  .sig-val.red { color:var(--red); }
+
+  /* MOTION TRACKER TABLE */
+  .tracker-table { width:100%; font-size:11px; border-collapse:collapse; }
+  .tracker-table th { color:var(--muted); font-weight:400; text-align:left; padding:4px 8px 8px; font-size:10px; text-transform:uppercase; letter-spacing:1px; }
+  .tracker-table td { padding:5px 8px; border-bottom:1px solid var(--border); }
+  .tracker-table tr:last-child td { border-bottom:none; }
+
+  /* LINE COUNTER */
+  .line-counter-card { background:var(--surface2); border-radius:8px; padding:14px; }
+  .counter-pair { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px; }
+  .counter-box { background:var(--surface3); border-radius:6px; padding:10px; text-align:center; }
+  .counter-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; }
+  .counter-val { font-family:var(--font-display); font-weight:800; font-size:28px; }
+
+  /* POTHOLE */
+  .pothole-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .pothole-card { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:12px; }
+  .pothole-loc { font-family:var(--font-display); font-weight:700; font-size:12px; margin-bottom:3px; }
+  .pothole-conf { font-size:11px; margin-bottom:6px; }
+  .pothole-sev { font-size:10px; padding:2px 7px; border-radius:3px; text-transform:uppercase; letter-spacing:0.5px; }
+
+  /* CONFIG */
+  .config-rows { display:flex; flex-direction:column; gap:14px; }
+  .config-row { background:var(--surface2); border-radius:8px; padding:12px; }
+  .config-row-header { display:flex; justify-content:space-between; margin-bottom:8px; font-size:11px; }
+  .config-key { color:var(--muted); }
+  .config-val { color:var(--green); font-family:var(--font-display); font-weight:700; }
+  .config-slider { width:100%; -webkit-appearance:none; appearance:none; height:3px; background:var(--surface3); border-radius:2px; outline:none; }
+  .config-slider::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--green); cursor:pointer; }
+
+  /* UPLOAD */
+  .upload-zone { border:1px dashed var(--border-bright); border-radius:8px; padding:20px; text-align:center; cursor:pointer; transition:border-color 0.2s; }
+  .upload-zone:hover { border-color:var(--green); }
+  .upload-icon { font-size:36px; opacity:0.4; margin-bottom:8px; }
+  .upload-label { color:var(--muted); font-size:12px; }
+  .upload-btn { display:inline-block; margin-top:12px; padding:7px 18px; background:var(--green-dim); color:var(--green); border-radius:6px; font-size:11px; cursor:pointer; border:1px solid rgba(34,197,94,0.3); font-family:var(--font-mono); transition:all 0.2s; letter-spacing:0.5px; }
+  .upload-btn:hover { background:var(--green); color:#000; }
+  .results-box { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:16px; margin-top:16px; display:none; }
+  .results-box.visible { display:block; }
+  .detection-result { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; }
+  .detection-result:last-child { border-bottom:none; }
+  .detection-name { color:var(--text); }
+  .detection-conf-bar { flex:1; height:3px; background:var(--surface3); border-radius:2px; margin:0 12px; overflow:hidden; }
+  .detection-conf-fill { height:100%; border-radius:2px; background:var(--cyan); }
+  .detection-pct { color:var(--cyan); font-family:var(--font-display); font-weight:700; min-width:36px; text-align:right; }
+
+  /* EMERGENCY BANNER */
+  .emergency-banner { background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.4); border-radius:10px; padding:14px 20px; display:none; align-items:center; gap:14px; margin-bottom:20px; animation:emergency-pulse 2s ease infinite; }
+  @keyframes emergency-pulse { 0%,100%{border-color:rgba(239,68,68,0.4);} 50%{border-color:rgba(239,68,68,0.9);} }
+  .emergency-icon { font-size:28px; }
+  .emergency-text { font-family:var(--font-display); font-weight:700; font-size:14px; color:var(--red); }
+  .emergency-sub { font-size:11px; color:var(--muted); margin-top:3px; }
+
+  /* SWITCH WARNING */
+  .switch-warning { background:rgba(59,130,246,0.12); border:1px solid rgba(59,130,246,0.4); border-radius:8px; padding:10px 14px; display:none; align-items:center; gap:10px; margin-top:8px; }
+  .switch-warning.visible { display:flex; }
+  .switch-warning-text { font-size:12px; color:var(--blue); }
+
+  /* MODAL */
+  .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:200; display:none; align-items:center; justify-content:center; }
+  .modal-backdrop.open { display:flex; }
+  .modal { background:var(--surface); border:1px solid var(--border-bright); border-radius:14px; padding:28px; width:420px; max-width:90vw; }
+  .modal-title { font-family:var(--font-display); font-weight:800; font-size:18px; margin-bottom:4px; }
+  .modal-sub { color:var(--muted); font-size:12px; margin-bottom:20px; }
+  .field-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:5px; }
+  .field-input { width:100%; background:var(--surface2); border:1px solid var(--border-bright); border-radius:7px; padding:9px 12px; color:var(--text); font-family:var(--font-mono); font-size:12px; outline:none; margin-bottom:14px; transition:border-color 0.2s; }
+  .field-input:focus { border-color:var(--green); }
+  .modal-actions { display:flex; gap:10px; margin-top:6px; }
+  .btn-primary { flex:1; background:var(--green); color:#000; border:none; border-radius:7px; padding:10px; font-family:var(--font-mono); font-weight:700; font-size:12px; cursor:pointer; letter-spacing:0.5px; transition:opacity 0.2s; }
+  .btn-primary:hover { opacity:0.85; }
+  .btn-ghost { padding:10px 16px; background:transparent; border:1px solid var(--border-bright); border-radius:7px; color:var(--muted); font-family:var(--font-mono); font-size:12px; cursor:pointer; transition:all 0.2s; }
+  .btn-ghost:hover { color:var(--text); }
+
+  /* SEP */
+  .sep { height:1px; background:var(--border); }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width:4px; }
+  ::-webkit-scrollbar-track { background:transparent; }
+  ::-webkit-scrollbar-thumb { background:var(--surface3); border-radius:4px; }
+
+  .toggle-group { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🚁</div>
+    <div class="logo-text">Aero<span>Signal</span></div>
+  </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('overview',this)">Overview</button>
+    <button class="nav-tab" onclick="switchTab('vehicles',this)">Vehicles</button>
+    <button class="nav-tab" onclick="switchTab('pothole',this)">Potholes</button>
+    <button class="nav-tab" onclick="switchTab('config',this)">Config</button>
+  </div>
+  <div class="header-status">
+    <div class="status-pill"><div class="pulse-dot" id="drone-dot"></div><span id="drone-status">Drone Online</span></div>
+    <div class="status-pill" id="clock-display">--:--:--</div>
+    <button class="mode-btn active" onclick="openConnectModal()">⚙ Connect</button>
+  </div>
+</header>
+
+<!-- EMERGENCY BANNER -->
+<div id="emergency-banner" class="emergency-banner" style="margin:16px 28px 0;">
+  <div class="emergency-icon">🚨</div>
+  <div>
+    <div class="emergency-text" id="emerg-banner-text">Emergency Vehicle Detected — Priority Active</div>
+    <div class="emergency-sub" id="emerg-banner-sub">Green hold active until passage confirmed</div>
+  </div>
+</div>
+
+<!-- ═══ TAB: OVERVIEW ═══ -->
+<div id="tab-overview" class="main active">
+
+  <!-- STAT ROW -->
+  <div class="stat-grid">
+    <div class="stat-card green">
+      <div class="stat-label">Total Vehicles Detected</div>
+      <div class="stat-value green" id="stat-total">0</div>
+      <div class="stat-sub">This session</div>
+    </div>
+    <div class="stat-card yellow">
+      <div class="stat-label">Active Green Lane</div>
+      <div class="stat-value yellow" id="stat-green-lane">Lane 1</div>
+      <div class="stat-sub" id="stat-lane-sub">Signal: GREEN · Switch in —s</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="stat-label">Smoothed Count (Avg)</div>
+      <div class="stat-value blue" id="stat-avg">0.0</div>
+      <div class="stat-sub">Rolling 15-frame window</div>
+    </div>
+    <div class="stat-card cyan">
+      <div class="stat-label">Stopped Vehicles</div>
+      <div class="stat-value cyan" id="stat-stopped">0</div>
+      <div class="stat-sub" id="stat-stopped-sub">0% — motion tracking active</div>
+    </div>
+  </div>
+
+  <!-- LANE SIGNALS -->
+  <div class="section-label">Lane Signal Status — Click to manually switch</div>
+  <div class="card" style="padding:16px;">
+    <div class="lanes-grid" id="lanes-grid"></div>
+    <!-- Early switch warning -->
+    <div class="switch-warning" id="switch-warning">
+      <span style="font-size:16px;">⚠</span>
+      <div class="switch-warning-text" id="switch-warning-text">Early switch pending...</div>
+    </div>
+    <!-- Phase progress bar -->
+    <div style="margin-top:12px;">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-bottom:4px;">
+        <span id="phase-label">GREEN phase</span>
+        <span id="phase-countdown">—</span>
+      </div>
+      <div class="phase-bar"><div class="phase-bar-fill" id="phase-bar-fill" style="width:100%;background:var(--green);"></div></div>
+    </div>
+  </div>
+
+  <!-- VIDEO + ALERTS -->
+  <div class="grid-left-heavy">
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:14px 18px 0;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div class="card-title" style="margin:0;">Live Drone Feed</div>
+        <span class="badge badge-green" id="live-badge">● LIVE</span>
+      </div>
+      <div class="video-feed" id="video-container" style="margin:0 14px 14px;border-radius:8px;">
+        <div class="feed-overlay">
+          <div class="feed-corner tl"></div>
+          <div class="feed-corner tr"></div>
+          <div class="feed-corner bl"></div>
+          <div class="feed-corner br"></div>
+        </div>
+        <!-- Detection overlay: bounding boxes + line counter -->
+        <div class="det-overlay" id="det-overlay">
+          <div class="det-line" id="det-line"></div>
+        </div>
+        <div class="feed-placeholder" id="feed-placeholder">
+          <div class="feed-icon">📡</div>
+          <div style="color:var(--muted);font-size:12px;margin-bottom:6px;">No source connected</div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">Connect a live stream or upload an MP4 file</div>
+          <div style="display:flex;gap:6px;justify-content:center;margin-bottom:14px;">
+            <button class="mode-btn active" id="feed-tab-stream" onclick="switchFeedTab('stream')">📡 Live Stream</button>
+            <button class="mode-btn" id="feed-tab-mp4" onclick="switchFeedTab('mp4')">🎬 Upload MP4</button>
+          </div>
+          <div id="feed-stream-input" style="width:100%;padding:0 16px 12px;">
+            <input class="feed-url-input" id="feed-url" placeholder="http://192.168.x.x:8080/video" value="http://192.168.29.211:8080/video" />
+            <button class="connect-btn" onclick="connectFeed()">Connect Stream</button>
+          </div>
+          <div id="feed-mp4-input" style="display:none;width:100%;padding:0 16px 12px;">
+            <div onclick="document.getElementById('mp4-upload').click()" style="border:1px dashed var(--border-bright);border-radius:8px;padding:16px;text-align:center;cursor:pointer;margin-bottom:8px;" onmouseover="this.style.borderColor='var(--green)'" onmouseout="this.style.borderColor='var(--border-bright)'">
+              <div style="font-size:28px;opacity:0.4;margin-bottom:6px;">🎬</div>
+              <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Click to select an MP4 or video file</div>
+              <span class="upload-btn">Choose File</span>
+            </div>
+            <input type="file" id="mp4-upload" accept="video/mp4,video/webm,video/*" style="display:none;" onchange="loadMP4(this)">
+          </div>
+        </div>
+        <video id="feed-video" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:8px;" controls loop playsinline></video>
+        <img id="feed-img" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:8px;" />
+        <div class="feed-info-bar" id="feed-info" style="display:none;">
+          <span id="feed-url-display"></span>
+          <span style="color:var(--green);" id="feed-det-info">Detecting…</span>
+          <button onclick="disconnectFeed()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:10px;font-family:var(--font-mono);">✕ Disconnect</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Event Log <span class="badge badge-blue" id="alert-count">0 events</span></div>
+      <div class="alert-list" id="alert-list">
+        <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px 0;">No events yet. Connect a stream or run a demo.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAM + LINE COUNTER + THROUGHPUT -->
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title">Jam Detection <span class="badge badge-green" id="jam-badge">FLOWING</span></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Triggers early switch when ≥<span id="cfg-display-jam-ratio">75</span>% vehicles stopped for <span id="cfg-display-jam-sec">5</span>s</div>
+      <div class="jam-meter">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);">
+          <span>Stopped ratio</span><span id="jam-pct">0%</span>
+        </div>
+        <div class="jam-bar-wrapper">
+          <div class="jam-bar-fill" id="jam-bar" style="width:0%"></div>
+          <div class="jam-threshold-line" id="jam-thresh-line"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:2px;">
+          <span>0%</span><span style="color:var(--yellow);" id="jam-thresh-label">75% threshold</span><span>100%</span>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;">Low traffic countdown: <span id="low-traffic-cd" style="color:var(--blue);">—</span></div>
+      <div style="font-size:10px;color:var(--muted);">Jam countdown: <span id="jam-cd" style="color:var(--red);">—</span></div>
+      <div class="sep" style="margin:12px 0;"></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;">
+        <div><div class="stat-label">Low Traffic</div><div style="font-family:var(--font-display);font-weight:700;font-size:20px;" id="switch-low">0</div></div>
+        <div><div class="stat-label">Jam Switch</div><div style="font-family:var(--font-display);font-weight:700;font-size:20px;" id="switch-jam">0</div></div>
+        <div><div class="stat-label">Manual</div><div style="font-family:var(--font-display);font-weight:700;font-size:20px;" id="switch-manual">0</div></div>
+        <div><div class="stat-label">Max Time</div><div style="font-family:var(--font-display);font-weight:700;font-size:20px;" id="switch-max">0</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Line Crossing Counter</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Virtual mid-frame tripwire (supervision LineZone)</div>
+      <div class="counter-pair">
+        <div class="counter-box">
+          <div class="counter-label">↓ IN</div>
+          <div class="counter-val" id="line-in" style="color:var(--green);">0</div>
+        </div>
+        <div class="counter-box">
+          <div class="counter-label">↑ OUT</div>
+          <div class="counter-val" id="line-out" style="color:var(--red);">0</div>
+        </div>
+      </div>
+      <div class="sep" style="margin:12px 0;"></div>
+      <div style="font-size:11px;color:var(--muted);">Net flow: <span id="net-flow" style="color:var(--cyan);font-family:var(--font-display);font-weight:700;">0</span></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:4px;">Crossings per minute: <span id="cross-rate" style="color:var(--text);">—</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Lane Throughput</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Cumulative session vehicle count</div>
+      <div id="throughput-bars" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB: VEHICLES ═══ -->
+<div id="tab-vehicles" class="main">
+  <div class="section-label">Vehicle Detection Module — YOLOv8x + ByteTrack</div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Detection Input</div>
+      <div class="toggle-group">
+        <button class="mode-btn active" id="vmode-live" onclick="setVMode('live')">Live Stream</button>
+        <button class="mode-btn" id="vmode-upload" onclick="setVMode('upload')">Upload Image</button>
+        <button class="mode-btn" id="vmode-demo" onclick="setVMode('demo')">Run Demo</button>
+      </div>
+
+      <div id="vmode-live-content">
+        <div class="signal-panel">
+          <div class="sig-row"><span class="sig-key">Model</span><span class="sig-val" style="color:var(--cyan);">yolov8x.pt</span></div>
+          <div class="sig-row"><span class="sig-key">Classes</span><span class="sig-val" style="color:var(--text);font-size:10px;">car · motorcycle · bus · truck</span></div>
+          <div class="sig-row"><span class="sig-key">Tracker</span><span class="sig-val" style="color:var(--text);">ByteTrack</span></div>
+          <div class="sig-row"><span class="sig-key">Confidence</span><span class="sig-val" id="conf-display-val">40%</span></div>
+          <div class="sig-row"><span class="sig-key">Device</span><span class="sig-val" id="device-display">CPU</span></div>
+          <div class="sig-row"><span class="sig-key">Stream</span><span class="sig-val" style="font-size:10px;color:var(--muted);" id="stream-url-display">Not connected</span></div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;">
+          <button class="connect-btn" onclick="openConnectModal()" style="background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,0.3);">📡 Connect Stream</button>
+        </div>
+      </div>
+
+      <div id="vmode-upload-content" style="display:none;">
+        <div class="toggle-group" style="margin-bottom:10px;">
+          <button class="mode-btn active" id="vup-tab-img" onclick="switchVUploadTab('img')">🖼 Image</button>
+          <button class="mode-btn" id="vup-tab-mp4" onclick="switchVUploadTab('mp4')">🎬 MP4 Video</button>
+        </div>
+        <div id="vup-img-content">
+          <div class="upload-zone" onclick="document.getElementById('file-upload-input').click()">
+            <div class="upload-icon">🖼</div>
+            <div class="upload-label">Drop an image here or click to browse</div>
+            <div class="upload-btn">Choose Image</div>
+          </div>
+          <input type="file" id="file-upload-input" accept="image/*" style="display:none;" onchange="handleVehicleImageUpload(this)">
+          <div id="vehicle-img-preview" style="display:none;margin-top:12px;position:relative;">
+            <img id="vehicle-preview-img" style="width:100%;border-radius:8px;max-height:200px;object-fit:cover;" />
+            <div id="vehicle-img-results" style="margin-top:8px;"></div>
+          </div>
+        </div>
+        <div id="vup-mp4-content" style="display:none;">
+          <div class="upload-zone" onclick="document.getElementById('vehicle-mp4-upload').click()">
+            <div class="upload-icon">🎬</div>
+            <div class="upload-label">Upload MP4 to run vehicle detection on</div>
+            <div class="upload-btn">Choose MP4</div>
+          </div>
+          <input type="file" id="vehicle-mp4-upload" accept="video/mp4,video/webm,video/*" style="display:none;" onchange="handleVehicleMP4(this)">
+          <div id="vehicle-mp4-preview" style="display:none;margin-top:12px;">
+            <video id="vehicle-mp4-player" controls style="width:100%;border-radius:8px;background:#000;max-height:200px;"></video>
+            <div style="margin-top:6px;font-size:11px;color:var(--muted);" id="vehicle-mp4-name"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="vmode-demo-content" style="display:none;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Simulate detection with preset traffic scenarios from yolov8_ip.py logic</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;">
+          <button class="mode-btn" onclick="runDemoScenario('light')">Light Traffic</button>
+          <button class="mode-btn" onclick="runDemoScenario('heavy')">Heavy Traffic</button>
+          <button class="mode-btn" onclick="runDemoScenario('jam')">Traffic Jam</button>
+          <button class="mode-btn" onclick="runDemoScenario('emergency')">Emergency Vehicle</button>
+        </div>
+        <div style="margin-top:12px;">
+          <button class="connect-btn" id="sim-toggle-btn" onclick="toggleSim()">▶ Start Live Simulation</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Vehicle Type Breakdown <span class="badge badge-cyan">COCO classes 2,3,5,7</span></div>
+      <div class="vtype-list" id="vtype-list"></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Motion Tracker — Stopped / Moving</div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">
+        Displacement &lt;<span id="stopped-px-display">8</span>px over <span id="stopped-frames-display">10</span> frames = STOPPED (red) · MOVE (cyan)
+      </div>
+      <table class="tracker-table">
+        <thead>
+          <tr>
+            <th>Track ID</th>
+            <th>Class</th>
+            <th>Conf</th>
+            <th>Status</th>
+            <th>Displacement</th>
+          </tr>
+        </thead>
+        <tbody id="tracker-tbody">
+          <tr><td colspan="5" style="color:var(--muted);text-align:center;padding:16px;">Run a demo or connect a stream</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Emergency Vehicle Detection <span class="badge badge-red" id="emerg-badge">INACTIVE</span></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:14px;">
+        Detects ambulance/fire/police via <strong style="color:var(--text);">emergency.pt</strong>. Holds current lane green until passage confirmed. Signal cycle suspended.
+      </div>
+      <div class="signal-panel">
+        <div class="sig-row"><span class="sig-key">Last detected</span><span id="emerg-last">None this session</span></div>
+        <div class="sig-row"><span class="sig-key">Green holds triggered</span><span id="emerg-count">0</span></div>
+        <div class="sig-row"><span class="sig-key">Avg hold duration</span><span id="emerg-avg">—</span></div>
+        <div class="sig-row"><span class="sig-key">Model</span><span style="color:var(--cyan);">emergency.pt</span></div>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px;">
+        <button class="connect-btn" onclick="simulateEmergency()" style="background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,0.3);">
+          🚑 Simulate Emergency Vehicle
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Signal State Machine — Full Status</div>
+    <div class="grid-3" style="margin-bottom:0;">
+      <div class="signal-panel">
+        <div class="sig-row"><span class="sig-key">Green Lane</span><span class="sig-val green" id="sm-green-lane">Lane 1</span></div>
+        <div class="sig-row"><span class="sig-key">Signal State</span><span class="sig-val green" id="sm-state">GREEN</span></div>
+        <div class="sig-row"><span class="sig-key">Switch in</span><span class="sig-val" id="sm-countdown">—</span></div>
+        <div class="sig-row"><span class="sig-key">Last switch reason</span><span id="sm-reason" style="color:var(--muted);font-size:11px;">—</span></div>
+      </div>
+      <div class="signal-panel">
+        <div class="sig-row"><span class="sig-key">Min green</span><span class="sig-val" id="sm-min-green">10s</span></div>
+        <div class="sig-row"><span class="sig-key">Max green</span><span class="sig-val" id="sm-max-green">60s</span></div>
+        <div class="sig-row"><span class="sig-key">Yellow phase</span><span class="sig-val">3s</span></div>
+        <div class="sig-row"><span class="sig-key">Rolling window</span><span class="sig-val" id="sm-rolling">15 frames</span></div>
+      </div>
+      <div class="signal-panel">
+        <div id="sm-lane-counts" style="display:flex;flex-direction:column;gap:5px;font-size:11px;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB: POTHOLES ═══ -->
+<div id="tab-pothole" class="main">
+  <div class="section-label">Pothole Detection Module — pothole.pt (YOLOv8)</div>
+
+  <div class="grid-left-heavy">
+    <div class="card">
+      <div class="card-title">Detection Input <span class="badge badge-cyan">pothole.pt</span></div>
+      <div class="toggle-group">
+        <button class="mode-btn active" id="pmode-stream" onclick="setPMode('stream')">Live Stream</button>
+        <button class="mode-btn" id="pmode-image" onclick="setPMode('image')">Upload Image</button>
+        <button class="mode-btn" id="pmode-mp4" onclick="setPMode('mp4')">Upload MP4</button>
+        <button class="mode-btn" id="pmode-demo" onclick="setPMode('demo')">Demo Scan</button>
+      </div>
+
+      <div id="pmode-stream-content">
+        <div class="signal-panel" style="margin-bottom:12px;">
+          <div class="sig-row"><span class="sig-key">Model</span><span style="color:var(--cyan);">pothole.pt</span></div>
+          <div class="sig-row"><span class="sig-key">Confidence</span><span id="p-conf-display">40%</span></div>
+          <div class="sig-row"><span class="sig-key">Stream source</span><span style="font-size:10px;color:var(--muted);" id="p-stream-display">Not connected</span></div>
+        </div>
+        <button class="connect-btn" onclick="openConnectModal()">📡 Connect Stream</button>
+      </div>
+
+      <div id="pmode-image-content" style="display:none;">
+        <div class="upload-zone" onclick="document.getElementById('pothole-img-input').click()">
+          <div class="upload-icon">🕳</div>
+          <div class="upload-label">Upload road image for pothole detection</div>
+          <div class="upload-btn">Choose Image</div>
+        </div>
+        <input type="file" id="pothole-img-input" accept="image/*" style="display:none;" onchange="handlePotholeImage(this)">
+        <div id="pothole-img-results" class="results-box">
+          <div class="card-title" style="font-size:13px;margin-bottom:8px;">Detection Results</div>
+          <div id="pothole-result-list"></div>
+        </div>
+      </div>
+
+      <div id="pmode-mp4-content" style="display:none;">
+        <div class="upload-zone" onclick="document.getElementById('pothole-mp4-input').click()">
+          <div class="upload-icon">🎬</div>
+          <div class="upload-label">Upload road video for pothole scanning</div>
+          <div class="upload-btn">Choose MP4</div>
+        </div>
+        <input type="file" id="pothole-mp4-input" accept="video/mp4,video/webm,video/*" style="display:none;" onchange="handlePotholeMP4(this)">
+        <div id="pothole-mp4-preview" style="display:none;margin-top:12px;">
+          <video id="pothole-mp4-player" controls style="width:100%;border-radius:8px;background:#000;max-height:200px;"></video>
+          <div style="margin-top:6px;font-size:11px;color:var(--muted);" id="pothole-mp4-name"></div>
+        </div>
+      </div>
+
+      <div id="pmode-demo-content" style="display:none;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Simulates the output of running pothole.pt at conf=0.4 on drone footage</div>
+        <button class="connect-btn" onclick="runPotholeDemo()">🚀 Run Demo Scan</button>
+      </div>
+
+      <!-- Pothole stats -->
+      <div style="margin-top:16px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+        <div style="background:var(--surface2);border-radius:6px;padding:10px;text-align:center;">
+          <div class="stat-label">Total</div>
+          <div style="font-family:var(--font-display);font-weight:700;font-size:22px;" id="p-total">0</div>
+        </div>
+        <div style="background:var(--red-dim);border-radius:6px;padding:10px;text-align:center;">
+          <div class="stat-label" style="color:var(--red);">High</div>
+          <div style="font-family:var(--font-display);font-weight:700;font-size:22px;color:var(--red);" id="p-high">0</div>
+        </div>
+        <div style="background:var(--yellow-dim);border-radius:6px;padding:10px;text-align:center;">
+          <div class="stat-label" style="color:var(--yellow);">Medium</div>
+          <div style="font-family:var(--font-display);font-weight:700;font-size:22px;color:var(--yellow);" id="p-med">0</div>
+        </div>
+        <div style="background:var(--green-dim);border-radius:6px;padding:10px;text-align:center;">
+          <div class="stat-label" style="color:var(--green);">Low</div>
+          <div style="font-family:var(--font-display);font-weight:700;font-size:22px;color:var(--green);" id="p-low">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Detected Potholes</div>
+      <div id="pothole-grid" class="pothole-grid">
+        <div style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:12px;padding:24px 0;">No potholes detected yet.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TAB: CONFIG ═══ -->
+<div id="tab-config" class="main">
+  <div class="section-label">System Configuration</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Signal Timing (yolov8_ip.py constants)</div>
+      <div class="config-rows">
+        <div class="config-row">
+          <div class="config-row-header"><span class="config-key">Min Green Duration</span><span class="config-val" id="cfg-min-green-val">10s</span></div>
+          <input type="range" class="config-slider" min="5" max="30" value="10" id="cfg-min-green" oninput="updateCfg('min-green',this.value,'s')">
+        </div>
+        <div class="config-row">
+          <div class="config-row-header"><span class="config-key">Max Green Duration</span><span class="config-val" id="cfg-max-green-val">60s</span></div>
+          <input type="range" class="config-slider" min="20" max="120" value="60" id="cfg-max-green" oninput="updateCfg('max-green',this.value,'s')">
+        </div>
+        <div class="config-row">
+          <div class="config-row-header"><span class="config-key">Yellow Phase Duration</span><span class="config-val" id="cfg-yellow-val">3s</span></div>
+          <input type="range" class="config-slider" min="1" max="10" value="3" id="cfg-yellow" oninput="updateCfg('yellow',this.value,'s')">
+        </div>
+        <div class="config-row">
+          <div class="config-row-header"><span class="config-key">Low Traffic Threshold</span><span class="config-val" id="cfg-low-thresh-val">5 vehicles</span></div>
+          <input type="range" class="config-slider" min="1" max="20" value="5" id="cfg-low-thresh" oninput="updateCfg('low-thresh',this.value,' vehicles')">
+        </div>
+        <div class="config-row">
+          <div class="config-row-header"><span class="config-key">Low Traffic Switch Delay</span><span class="config-val" id="cfg-low-seconds-val">5s</span></div>
+          <input type="range" class="config-slider" min="2" max="20" value="5" id="cfg-low-seconds" oninput="updateCfg('low-seconds',this.value,'s')">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Jam Detection Parameters</div>
+      <div class="config-rows">
+        <div class="config-row">
+          <div class="config-row-header"><span class="config-key">Jam Stopped Ratio</span><span class="config-val" id="cfg-jam-ratio-val">75%</span></div>
+          <input type="range" class="config-slider" min="50" max="95" value="75" id="cfg-jam-ratio" oninput="updateCfg('jam-ratio',this.value,'%')">
+        </div>
+        <div class="config-row">
+          <div class="config-row-header"><span class="config-key">Jam Hold Duration</span><span class="config-val" id="cfg-jam-seconds-val">5s</span></div>
+          <input type="range" class="config-slider" min="2" max="15" value="5" id="cfg-jam-seconds" oninput="updateCfg('jam-seconds',this.value,'s')">
+        </div>
+        <div class="config-row">
+          <div class="config-row-header"><span class="config-key">Rolling Average Window</span><span class="config-val" id="cfg-rolling-val">15 frames</span></div>
+          <input type="range" class="config-slider" min="5" max="30" value="15" id="cfg-rolling" oninput="updateCfg('rolling',this.value,' frames')">
+        </div>
+        <div class="config-row">
+          <div class="config-row-header"><span class="config-key">YOLO Confidence Threshold</span><span class="config-val" id="cfg-conf-val">40%</span></div>
+          <input type="range" class="config-slider" min="10" max="90" value="40" id="cfg-conf" oninput="updateCfg('conf',this.value,'%')">
+        </div>
+        <div class="config-row">
+          <div class="config-row-header"><span class="config-key">Stopped Displacement Px</span><span class="config-val" id="cfg-stopped-px-val">8px</span></div>
+          <input type="range" class="config-slider" min="2" max="24" value="8" id="cfg-stopped-px" oninput="updateCfg('stopped-px',this.value,'px')">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">Lane Configuration</div>
+      <div id="lane-config-list" style="display:flex;flex-direction:column;gap:10px;"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Model & Stream Paths</div>
+      <div class="config-rows">
+        <div class="config-row">
+          <div class="field-label">Vehicle Detection Model</div>
+          <input class="field-input" id="cfg-vehicle-model" value="yolov8x.pt" placeholder="Path to YOLO model" />
+        </div>
+        <div class="config-row">
+          <div class="field-label">Pothole Detection Model</div>
+          <input class="field-input" id="cfg-pothole-model" value="pothole.pt" placeholder="Path to pothole model" />
+        </div>
+        <div class="config-row">
+          <div class="field-label">Emergency Detection Model</div>
+          <input class="field-input" id="cfg-emergency-model" value="emergency.pt" placeholder="Path to emergency model" />
+        </div>
+        <div class="config-row">
+          <div class="field-label">Stream URL (IP Webcam / Drone)</div>
+          <input class="field-input" id="cfg-stream-url" value="http://192.168.29.211:8080/video" placeholder="http://x.x.x.x:8080/video" onchange="syncStreamUrl(this.value)" />
+        </div>
+        <button class="connect-btn" onclick="saveConfig()">Save Configuration</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CONNECT MODAL -->
+<div class="modal-backdrop" id="connect-modal">
+  <div class="modal">
+    <div class="modal-title">Connect Drone Stream</div>
+    <div class="modal-sub">Enter the IP Webcam URL from your drone or phone camera (e.g. IP Webcam app)</div>
+    <div class="field-label">Stream URL</div>
+    <input class="field-input" id="modal-stream-url" placeholder="http://192.168.x.x:8080/video" value="http://192.168.29.211:8080/video" />
+    <div class="field-label">Label (optional)</div>
+    <input class="field-input" id="modal-label" placeholder="Drone Camera 1" />
+    <div class="modal-actions">
+      <button class="btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn-primary" onclick="connectFromModal()">Connect →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// CONFIG — mirrors Python constants from yolov8_ip.py
+// ═══════════════════════════════════════════════════════════════════
+const CFG = {
+  LOW_TRAFFIC_THRESHOLD: 5,
+  LOW_TRAFFIC_SECONDS: 5.0,
+  MIN_GREEN_SECONDS: 10.0,
+  MAX_GREEN_SECONDS: 60.0,
+  YELLOW_SECONDS: 3.0,
+  JAM_STOPPED_RATIO: 0.75,
+  JAM_SECONDS: 5.0,
+  STOPPED_DISPLACEMENT_PX: 8,
+  STOPPED_HISTORY_FRAMES: 10,
+  ROLLING_WINDOW_FRAMES: 15,
+  CONFIDENCE: 0.4,
+  VEHICLE_CLASSES: ['car','motorcycle','bus','truck'],
+  LANE_NAMES: ['Lane 1','Lane 2','Lane 3','Lane 4'],
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// ROLLING COUNTER — mirrors RollingCounter class
+// ═══════════════════════════════════════════════════════════════════
+class RollingCounter {
+  constructor(window = CFG.ROLLING_WINDOW_FRAMES) {
+    this.window = window;
+    this.history = [];
+  }
+  update(count) {
+    this.history.push(count);
+    if (this.history.length > this.window) this.history.shift();
+    return this.history.reduce((a,b) => a+b, 0) / this.history.length;
+  }
+  reset() { this.history = []; }
+  get avg() { return this.history.length ? this.history.reduce((a,b)=>a+b,0)/this.history.length : 0; }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SIGNAL CHECKER — mirrors SignalChecker class
+// ═══════════════════════════════════════════════════════════════════
+class SignalChecker {
+  constructor() { this.lowSince = null; this.jamSince = null; }
+  check(smoothedCount, stoppedCount, now) {
+    let earlySwitch = false, reason = '', countdown = null;
+    // Low traffic
+    if (smoothedCount < CFG.LOW_TRAFFIC_THRESHOLD) {
+      if (this.lowSince === null) this.lowSince = now;
+      const lowElapsed = now - this.lowSince;
+      countdown = Math.max(0, CFG.LOW_TRAFFIC_SECONDS - lowElapsed);
+      if (lowElapsed >= CFG.LOW_TRAFFIC_SECONDS) { earlySwitch = true; reason = 'LOW TRAFFIC'; }
+    } else { this.lowSince = null; }
+    // Jam
+    const total = Math.max(Math.round(smoothedCount), 1);
+    const stoppedRatio = stoppedCount / total;
+    if (stoppedRatio >= CFG.JAM_STOPPED_RATIO && smoothedCount >= 2) {
+      if (this.jamSince === null) this.jamSince = now;
+      const jamElapsed = now - this.jamSince;
+      const jamCd = Math.max(0, CFG.JAM_SECONDS - jamElapsed);
+      countdown = countdown === null ? jamCd : Math.min(countdown, jamCd);
+      if (jamElapsed >= CFG.JAM_SECONDS) { earlySwitch = true; reason = 'TRAFFIC JAM'; }
+    } else { this.jamSince = null; }
+    return { earlySwitch, reason, countdown };
+  }
+  reset() { this.lowSince = null; this.jamSince = null; }
+  get activeLowCountdown() {
+    if (this.lowSince === null) return null;
+    return Math.max(0, CFG.LOW_TRAFFIC_SECONDS - (Date.now()/1000 - this.lowSince));
+  }
+  get activeJamCountdown() {
+    if (this.jamSince === null) return null;
+    return Math.max(0, CFG.JAM_SECONDS - (Date.now()/1000 - this.jamSince));
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TRAFFIC STATE MACHINE — mirrors TrafficStateMachine class
+// ═══════════════════════════════════════════════════════════════════
+class TrafficStateMachine {
+  constructor(laneNames) {
+    this.lanes = laneNames;
+    this.idx = 0;
+    this.state = 'GREEN'; // GREEN | YELLOW
+    this.phaseStart = Date.now() / 1000;
+    this.checker = new SignalChecker();
+    this.switchReason = '';
+    this.earlyCd = null;
+    this.lastCounts = Object.fromEntries(laneNames.map(n => [n, 0]));
+    this.onSwitch = null; // callback
+  }
+  get greenLane() { return this.lanes[this.idx]; }
+  get countdown() {
+    const now = Date.now() / 1000;
+    const elapsed = now - this.phaseStart;
+    if (this.state === 'YELLOW') return Math.max(0, CFG.YELLOW_SECONDS - elapsed);
+    const timeToMax = Math.max(0, CFG.MAX_GREEN_SECONDS - elapsed);
+    return this.earlyCd !== null ? Math.min(timeToMax, this.earlyCd) : timeToMax;
+  }
+  update(smoothedCount, stoppedCount) {
+    const now = Date.now() / 1000;
+    this.lastCounts[this.greenLane] = smoothedCount;
+    const elapsed = now - this.phaseStart;
+
+    if (this.state === 'GREEN') {
+      const forceSwitch = elapsed >= CFG.MAX_GREEN_SECONDS;
+      const { earlySwitch, reason, countdown } = this.checker.check(smoothedCount, stoppedCount, now);
+      this.earlyCd = (elapsed >= CFG.MIN_GREEN_SECONDS) ? countdown : null;
+      const canEarlySwitch = earlySwitch && elapsed >= CFG.MIN_GREEN_SECONDS;
+
+      if (forceSwitch || canEarlySwitch) {
+        this.switchReason = forceSwitch ? 'MAX TIME' : reason;
+        this.state = 'YELLOW';
+        this.phaseStart = now;
+        this.earlyCd = null;
+        this.checker.reset();
+        addAlert(`[SIGNAL] ${this.greenLane} → YELLOW (${this.switchReason})`, 'warn');
+      }
+    } else if (this.state === 'YELLOW') {
+      this.earlyCd = null;
+      if (elapsed >= CFG.YELLOW_SECONDS) {
+        const prev = this.greenLane;
+        this.idx = (this.idx + 1) % this.lanes.length;
+        this.state = 'GREEN';
+        this.phaseStart = now;
+        laneSmootherReset();
+        if (this.onSwitch) this.onSwitch(prev, this.greenLane, this.switchReason);
+        this.switchReason = '';
+        addAlert(`[SIGNAL] GREEN: ${this.greenLane}`, 'success');
+      }
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MOTION TRACKER — mirrors MotionTracker (simplified JS version)
+// ═══════════════════════════════════════════════════════════════════
+class MotionTracker {
+  constructor() { this.history = {}; }
+  update(tracks) { // tracks: [{id, cx, cy, classId, conf}]
+    const result = {};
+    tracks.forEach(t => {
+      if (!this.history[t.id]) this.history[t.id] = [];
+      this.history[t.id].push({ cx: t.cx, cy: t.cy });
+      if (this.history[t.id].length > CFG.STOPPED_HISTORY_FRAMES)
+        this.history[t.id].shift();
+      const h = this.history[t.id];
+      if (h.length >= 2) {
+        const dx = h[h.length-1].cx - h[0].cx;
+        const dy = h[h.length-1].cy - h[0].cy;
+        const disp = Math.sqrt(dx*dx + dy*dy);
+        result[t.id] = { stopped: disp < CFG.STOPPED_DISPLACEMENT_PX, displacement: disp };
+      } else {
+        result[t.id] = { stopped: false, displacement: 0 };
+      }
+    });
+    // Prune old
+    const active = new Set(tracks.map(t => t.id));
+    Object.keys(this.history).forEach(k => { if (!active.has(parseInt(k))) delete this.history[k]; });
+    return result;
+  }
+  reset() { this.history = {}; }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// GLOBAL STATE
+// ═══════════════════════════════════════════════════════════════════
+const rollingCounter = new RollingCounter();
+function laneSmootherReset() { rollingCounter.reset(); }
+
+const stateMachine = new TrafficStateMachine(CFG.LANE_NAMES.slice());
+const motionTracker = new MotionTracker();
+
+stateMachine.onSwitch = (from, to, reason) => {
+  if (reason === 'LOW TRAFFIC') state.switchLow++;
+  else if (reason === 'TRAFFIC JAM') state.switchJam++;
+  else if (reason === 'MAX TIME') state.switchMax++;
+  addAlert(`[DRONE] Rotate to face: ${to}`, 'info');
+};
+
+const state = {
+  lanes: CFG.LANE_NAMES.map(n => ({ name: n, vehicles: 0, cumulative: 0 })),
+  totalVehicles: 0,
+  stoppedVehicles: 0,
+  smoothedCount: 0,
+  vehicleTypes: { car: 0, motorcycle: 0, bus: 0, truck: 0 },
+  alerts: [],
+  alertCount: 0,
+  switchLow: 0,
+  switchJam: 0,
+  switchManual: 0,
+  switchMax: 0,
+  emergencyActive: false,
+  emergencyCount: 0,
+  streamConnected: false,
+  potholes: [],
+  lineIn: 0,
+  lineOut: 0,
+  trackedVehicles: [],
+  simRunning: false,
+  nextTrackId: 1,
+  crossingsThisMinute: 0,
+  lastCrossTime: Date.now(),
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════════════════════════════════════
+function updateClock() {
+  document.getElementById('clock-display').textContent =
+    new Date().toLocaleTimeString('en-IN', { hour12: false });
+}
+setInterval(updateClock, 1000); updateClock();
+
+// ═══════════════════════════════════════════════════════════════════
+// TAB SWITCHING
+// ═══════════════════════════════════════════════════════════════════
+function switchTab(tab, el) {
+  document.querySelectorAll('.main').forEach(e => e.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(e => e.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (el) el.classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER LANES
+// ═══════════════════════════════════════════════════════════════════
+function renderLanes() {
+  const sig = stateMachine;
+  const grid = document.getElementById('lanes-grid');
+  grid.innerHTML = state.lanes.map((lane, i) => {
+    let cls = '';
+    if (i === sig.idx) cls = sig.state === 'GREEN' ? 'active-green' : 'active-yellow';
+    const fill = Math.min(100, Math.round((lane.vehicles / 25) * 100));
+    const isActive = i === sig.idx;
+    const cd = isActive ? sig.countdown.toFixed(1) + 's' : '';
+    return `
+      <div class="lane-card ${cls}" onclick="manualSwitch(${i})" title="Click to manually switch to ${lane.name}">
+        <div class="lane-name">${lane.name}</div>
+        <div class="traffic-light">
+          <div class="tl-dot tl-red"></div>
+          <div class="tl-dot tl-yellow"></div>
+          <div class="tl-dot tl-green"></div>
+        </div>
+        <div class="lane-vehicles" style="color:${isActive&&sig.state==='GREEN'?'var(--green)':isActive?'var(--yellow)':'var(--text)'}">${lane.vehicles}</div>
+        <div class="lane-sublabel">vehicles detected</div>
+        <div class="lane-bar"><div class="lane-bar-fill" style="width:${fill}%"></div></div>
+        <div class="lane-countdown">${isActive ? `${sig.state} · ${cd}` : sig.lastCounts[lane.name] !== undefined ? sig.lastCounts[lane.name].toFixed(1)+' avg' : ''}</div>
+      </div>`;
+  }).join('');
+
+  // Phase bar
+  const elapsed = (Date.now()/1000) - sig.phaseStart;
+  const total = sig.state === 'GREEN' ? CFG.MAX_GREEN_SECONDS : CFG.YELLOW_SECONDS;
+  const pct = Math.max(0, Math.min(100, 100 - (elapsed / total) * 100));
+  const fill = document.getElementById('phase-bar-fill');
+  fill.style.width = pct + '%';
+  fill.style.background = sig.state === 'GREEN' ? 'var(--green)' : 'var(--yellow)';
+  document.getElementById('phase-label').textContent = sig.state + ' phase — ' + sig.greenLane;
+  document.getElementById('phase-countdown').textContent = sig.countdown.toFixed(1) + 's remaining';
+
+  // Early switch warning
+  const warn = document.getElementById('switch-warning');
+  if (sig.earlyCd !== null && sig.state === 'GREEN') {
+    warn.classList.add('visible');
+    document.getElementById('switch-warning-text').textContent =
+      `Early switch pending in ${sig.earlyCd.toFixed(1)}s — ${sig.checker.lowSince ? 'LOW TRAFFIC' : 'TRAFFIC JAM'}`;
+  } else { warn.classList.remove('visible'); }
+
+  // Throughput bars
+  const tb = document.getElementById('throughput-bars');
+  const max = Math.max(...state.lanes.map(l => l.cumulative), 1);
+  tb.innerHTML = state.lanes.map(l => `
+    <div style="display:flex;align-items:center;gap:10px;font-size:11px;">
+      <div style="min-width:48px;color:var(--muted);">${l.name}</div>
+      <div style="flex:1;height:6px;background:var(--surface3);border-radius:3px;overflow:hidden;">
+        <div style="width:${Math.round((l.cumulative/max)*100)}%;height:100%;background:var(--green);border-radius:3px;transition:width 0.8s;"></div>
+      </div>
+      <div style="min-width:28px;text-align:right;font-family:var(--font-display);font-weight:700;">${l.cumulative}</div>
+    </div>`).join('');
+
+  // Lane config tab
+  const lc = document.getElementById('lane-config-list');
+  if (lc) {
+    lc.innerHTML = state.lanes.map((lane, i) => `
+      <div style="display:flex;align-items:center;gap:10px;">
+        <input class="field-input" style="margin:0;flex:1;" value="${lane.name}" onchange="renameLane(${i}, this.value)" />
+        <span class="badge ${i===sig.idx?'badge-green':'badge-blue'}">${i===sig.idx?sig.state:'WAITING'}</span>
+      </div>`).join('');
+  }
+
+  // Signal machine panel in vehicles tab
+  const smLaneCounts = document.getElementById('sm-lane-counts');
+  if (smLaneCounts) {
+    smLaneCounts.innerHTML = CFG.LANE_NAMES.map(n => `
+      <div style="display:flex;justify-content:space-between;">
+        <span style="color:${n===sig.greenLane?'var(--green)':'var(--muted)'};">${n}</span>
+        <span style="font-family:var(--font-display);font-weight:700;">${(sig.lastCounts[n]||0).toFixed(1)} veh</span>
+      </div>`).join('');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER STATS
+// ═══════════════════════════════════════════════════════════════════
+function renderStats() {
+  const sig = stateMachine;
+  document.getElementById('stat-total').textContent = state.totalVehicles;
+  document.getElementById('stat-green-lane').textContent = sig.greenLane;
+  document.getElementById('stat-lane-sub').textContent = `Signal: ${sig.state} · Switch in ${sig.countdown.toFixed(1)}s`;
+  document.getElementById('stat-avg').textContent = state.smoothedCount.toFixed(1);
+  document.getElementById('stat-stopped').textContent = state.stoppedVehicles;
+  const currentVeh = state.lanes[sig.idx].vehicles;
+  const pct = currentVeh > 0 ? Math.round((state.stoppedVehicles / currentVeh) * 100) : 0;
+  document.getElementById('stat-stopped-sub').textContent = `${pct}% stopped · motion tracking`;
+
+  // Jam bar
+  const jamBar = document.getElementById('jam-bar');
+  jamBar.style.width = pct + '%';
+  jamBar.className = 'jam-bar-fill' + (pct >= CFG.JAM_STOPPED_RATIO * 100 ? ' danger' : pct >= 40 ? ' warn' : '');
+  document.getElementById('jam-pct').textContent = pct + '%';
+  const jamBadge = document.getElementById('jam-badge');
+  if (pct >= CFG.JAM_STOPPED_RATIO * 100) {
+    jamBadge.className = 'badge badge-red'; jamBadge.textContent = 'JAM DETECTED';
+  } else if (pct >= 40) {
+    jamBadge.className = 'badge badge-yellow'; jamBadge.textContent = 'CONGESTED';
+  } else {
+    jamBadge.className = 'badge badge-green'; jamBadge.textContent = 'FLOWING';
+  }
+
+  // Low traffic / jam countdowns
+  const lowCd = sig.checker.activeLowCountdown;
+  const jamCd = sig.checker.activeJamCountdown;
+  document.getElementById('low-traffic-cd').textContent = lowCd !== null ? lowCd.toFixed(1) + 's' : '—';
+  document.getElementById('jam-cd').textContent = jamCd !== null ? jamCd.toFixed(1) + 's' : '—';
+
+  document.getElementById('switch-low').textContent = state.switchLow;
+  document.getElementById('switch-jam').textContent = state.switchJam;
+  document.getElementById('switch-manual').textContent = state.switchManual;
+  document.getElementById('switch-max').textContent = state.switchMax;
+
+  // Line counter
+  document.getElementById('line-in').textContent = state.lineIn;
+  document.getElementById('line-out').textContent = state.lineOut;
+  document.getElementById('net-flow').textContent = state.lineIn - state.lineOut;
+
+  // Signal machine status panel
+  const smState = document.getElementById('sm-state');
+  if (smState) {
+    document.getElementById('sm-green-lane').textContent = sig.greenLane;
+    smState.textContent = sig.state;
+    smState.className = 'sig-val ' + (sig.state === 'GREEN' ? 'green' : 'yellow');
+    document.getElementById('sm-countdown').textContent = sig.countdown.toFixed(1) + 's';
+    document.getElementById('sm-reason').textContent = sig.switchReason || '—';
+    document.getElementById('sm-min-green').textContent = CFG.MIN_GREEN_SECONDS + 's';
+    document.getElementById('sm-max-green').textContent = CFG.MAX_GREEN_SECONDS + 's';
+    document.getElementById('sm-rolling').textContent = CFG.ROLLING_WINDOW_FRAMES + ' frames';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER VEHICLE TYPES
+// ═══════════════════════════════════════════════════════════════════
+function renderVehicleTypes() {
+  const types = [
+    { key:'car', label:'Car (class 2)', icon:'🚗', color:'var(--blue)' },
+    { key:'motorcycle', label:'Motorcycle (class 3)', icon:'🏍', color:'var(--cyan)' },
+    { key:'bus', label:'Bus (class 5)', icon:'🚌', color:'var(--green)' },
+    { key:'truck', label:'Truck (class 7)', icon:'🚛', color:'var(--yellow)' },
+  ];
+  const max = Math.max(...types.map(t => state.vehicleTypes[t.key]), 1);
+  document.getElementById('vtype-list').innerHTML = types.map(t => `
+    <div class="vtype-row">
+      <div class="vtype-icon" style="background:rgba(255,255,255,0.05);">${t.icon}</div>
+      <span class="vtype-label">${t.label}</span>
+      <div class="vtype-bar"><div class="vtype-bar-fill" style="width:${Math.round((state.vehicleTypes[t.key]/max)*100)}%;background:${t.color};"></div></div>
+      <span class="vtype-count" style="color:${t.color};">${state.vehicleTypes[t.key]}</span>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RENDER MOTION TRACKER TABLE
+// ═══════════════════════════════════════════════════════════════════
+function renderTrackerTable() {
+  const tbody = document.getElementById('tracker-tbody');
+  if (!state.trackedVehicles.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:16px;">Run a demo or connect a stream</td></tr>';
+    return;
+  }
+  tbody.innerHTML = state.trackedVehicles.slice(0, 12).map(v => {
+    const statusColor = v.stopped ? 'var(--red)' : 'var(--cyan)';
+    const statusText = v.stopped ? '■ STOP' : '▶ MOVE';
+    return `
+      <tr>
+        <td style="color:var(--muted);">#${v.id}</td>
+        <td>${v.classIcon} ${v.className}</td>
+        <td style="color:var(--text);">${(v.conf*100).toFixed(0)}%</td>
+        <td style="color:${statusColor};font-weight:700;">${statusText}</td>
+        <td style="color:var(--muted);">${v.displacement.toFixed(1)}px</td>
+      </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ADD ALERT
+// ═══════════════════════════════════════════════════════════════════
+function addAlert(text, type = 'info') {
+  const colors = { info:'var(--blue)', warn:'var(--yellow)', danger:'var(--red)', success:'var(--green)' };
+  const now = new Date().toLocaleTimeString('en-IN', { hour12:false });
+  state.alerts.unshift({ text, type, time: now });
+  state.alertCount++;
+  const list = document.getElementById('alert-list');
+  if (state.alertCount === 1) list.innerHTML = '';
+  list.innerHTML = state.alerts.slice(0, 25).map(a => `
+    <div class="alert-item">
+      <div class="alert-indicator" style="background:${colors[a.type]||colors.info};"></div>
+      <div class="alert-content">
+        <div class="alert-event">${a.text}</div>
+        <div class="alert-time">${a.time}</div>
+      </div>
+    </div>`).join('');
+  document.getElementById('alert-count').textContent = `${state.alertCount} events`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MANUAL LANE SWITCH
+// ═══════════════════════════════════════════════════════════════════
+function manualSwitch(laneIdx) {
+  if (laneIdx === stateMachine.idx || stateMachine.state === 'YELLOW' || state.emergencyActive) return;
+  const prev = stateMachine.greenLane;
+  stateMachine.state = 'YELLOW';
+  stateMachine.phaseStart = Date.now() / 1000;
+  addAlert(`Manual switch: ${prev} → ${state.lanes[laneIdx].name}`, 'warn');
+  setTimeout(() => {
+    stateMachine.idx = laneIdx;
+    stateMachine.state = 'GREEN';
+    stateMachine.phaseStart = Date.now() / 1000;
+    state.switchManual++;
+    laneSmootherReset();
+    renderLanes(); renderStats();
+  }, CFG.YELLOW_SECONDS * 1000);
+}
+
+function renameLane(idx, name) {
+  state.lanes[idx].name = name;
+  stateMachine.lanes[idx] = name;
+  // rebuild lastCounts key
+  const oldName = CFG.LANE_NAMES[idx];
+  stateMachine.lastCounts[name] = stateMachine.lastCounts[oldName] || 0;
+  delete stateMachine.lastCounts[oldName];
+  CFG.LANE_NAMES[idx] = name;
+  renderLanes();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SIMULATION ENGINE — full state machine driven
+// ═══════════════════════════════════════════════════════════════════
+let simInterval = null;
+let simTick = 0;
+let simScenario = 'auto'; // auto | light | heavy | jam
+
+function toggleSim() {
+  if (simInterval) stopSim(); else startSim();
+}
+
+function startSim() {
+  if (simInterval) return;
+  simInterval = setInterval(tick, 1000);
+  state.simRunning = true;
+  document.getElementById('sim-toggle-btn').textContent = '⏹ Stop Simulation';
+  document.getElementById('sim-toggle-btn').style.background = 'var(--red-dim)';
+  document.getElementById('sim-toggle-btn').style.color = 'var(--red)';
+  document.getElementById('sim-toggle-btn').style.border = '1px solid rgba(239,68,68,0.3)';
+  addAlert('Live simulation started — full state machine active', 'info');
+}
+
+function stopSim() {
+  clearInterval(simInterval); simInterval = null;
+  state.simRunning = false;
+  document.getElementById('sim-toggle-btn').textContent = '▶ Start Live Simulation';
+  document.getElementById('sim-toggle-btn').style = '';
+  addAlert('Simulation stopped', 'warn');
+}
+
+function tick() {
+  simTick++;
+  const sig = stateMachine;
+  const laneIdx = sig.idx;
+
+  // Generate per-lane counts
+  state.lanes.forEach((lane, i) => {
+    let base, noise;
+    if (simScenario === 'light') { base = i === laneIdx ? 3 : 1; noise = 2; }
+    else if (simScenario === 'heavy') { base = i === laneIdx ? 18 : 7; noise = 5; }
+    else if (simScenario === 'jam') { base = i === laneIdx ? 14 : 6; noise = 3; }
+    else { base = i === laneIdx ? 10 + Math.sin(simTick/5)*4 : 3 + Math.random()*4; noise = 3; }
+    lane.vehicles = Math.max(0, Math.round(base + (Math.random()-0.5)*noise));
+    lane.cumulative += lane.vehicles;
+  });
+
+  const rawCount = state.lanes[laneIdx].vehicles;
+
+  // Motion tracking simulation — generate fake tracked vehicles
+  const numVehicles = rawCount;
+  const tracks = Array.from({length: numVehicles}, (_, j) => ({
+    id: ((laneIdx * 1000) + ((simTick * 10 + j) % 200)),
+    cx: Math.random() * 640,
+    cy: Math.random() * 480,
+    classId: Math.floor(Math.random() * 4),
+    conf: 0.55 + Math.random() * 0.4,
+  }));
+  const motionResult = motionTracker.update(tracks);
+
+  // Stopped count from motion tracker
+  const stoppedCount = simScenario === 'jam'
+    ? Math.round(numVehicles * (0.75 + Math.random() * 0.2))
+    : Object.values(motionResult).filter(r => r.stopped).length;
+
+  // Update rolling counter (mirrors lane_smoother.update)
+  state.smoothedCount = rollingCounter.update(rawCount);
+  state.stoppedVehicles = stoppedCount;
+  state.totalVehicles += rawCount;
+
+  // Update vehicle type breakdown (COCO class distribution)
+  state.vehicleTypes.car = Math.round(rawCount * 0.55);
+  state.vehicleTypes.motorcycle = Math.round(rawCount * 0.18);
+  state.vehicleTypes.bus = Math.round(rawCount * 0.10);
+  state.vehicleTypes.truck = Math.round(rawCount * 0.17);
+
+  // Simulate line crossings
+  const crossings = Math.round(Math.random() * 2);
+  if (crossings > 0) {
+    state.lineIn += crossings;
+    if (Math.random() > 0.4) state.lineOut += Math.floor(crossings / 2 + 0.5);
+  }
+
+  // Build tracker table data
+  const classIcons = ['🚗','🏍','🚌','🚛'];
+  const classNames = ['Car','Motorcycle','Bus','Truck'];
+  state.trackedVehicles = tracks.map(t => ({
+    id: t.id,
+    classIcon: classIcons[t.classId],
+    className: classNames[t.classId],
+    conf: t.conf,
+    stopped: motionResult[t.id]?.stopped ?? false,
+    displacement: motionResult[t.id]?.displacement ?? 0,
+  }));
+
+  // Feed detection overlay (simulated bboxes on video)
+  renderDetectionOverlay(tracks, motionResult, stoppedCount, rawCount);
+
+  // Run state machine update — this drives all signal switching
+  if (!state.emergencyActive) {
+    stateMachine.update(state.smoothedCount, stoppedCount);
+  }
+
+  // Update feed info bar
+  const detInfo = document.getElementById('feed-det-info');
+  if (detInfo) {
+    detInfo.textContent = `${rawCount} veh · ${stoppedCount} stopped · avg ${state.smoothedCount.toFixed(1)}`;
+  }
+
+  renderLanes(); renderStats(); renderVehicleTypes(); renderTrackerTable();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SIMULATED DETECTION OVERLAY ON VIDEO
+// ═══════════════════════════════════════════════════════════════════
+function renderDetectionOverlay(tracks, motionResult, stoppedCount, total) {
+  const overlay = document.getElementById('det-overlay');
+  const container = document.getElementById('video-container');
+  const w = container.clientWidth || 640;
+  const h = container.clientHeight || 360;
+
+  // Remove old boxes (keep the line)
+  overlay.querySelectorAll('.det-box').forEach(b => b.remove());
+
+  if (!state.streamConnected && !state.simRunning) return;
+
+  tracks.slice(0, 8).forEach(t => {
+    const stopped = motionResult[t.id]?.stopped ?? false;
+    const bw = 60 + Math.random() * 40, bh = 30 + Math.random() * 25;
+    const bx = (t.cx / 640) * w * 0.9;
+    const by = (t.cy / 480) * h * 0.7 + h * 0.05;
+    const box = document.createElement('div');
+    box.className = 'det-box' + (stopped ? ' stopped' : '');
+    box.style.cssText = `left:${bx}px;top:${by}px;width:${bw}px;height:${bh}px;`;
+    const lbl = document.createElement('div');
+    lbl.className = 'det-label';
+    lbl.textContent = `#${t.id%100} ${['car','moto','bus','truck'][t.classId%4]} ${(t.conf*100).toFixed(0)}% [${stopped?'STOP':'MOVE'}]`;
+    box.appendChild(lbl);
+    overlay.appendChild(box);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DEMO SCENARIOS
+// ═══════════════════════════════════════════════════════════════════
+function runDemoScenario(scenario) {
+  simScenario = scenario;
+  if (!simInterval) startSim();
+  if (scenario === 'emergency') { simulateEmergency(); return; }
+  const label = { light:'light traffic', heavy:'heavy traffic', jam:'traffic jam scenario' };
+  addAlert(`Scenario loaded: ${label[scenario]} (state machine active)`, 'info');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// EMERGENCY VEHICLE — emergency.pt logic
+// ═══════════════════════════════════════════════════════════════════
+function simulateEmergency() {
+  if (state.emergencyActive) return;
+  state.emergencyActive = true;
+  state.emergencyCount++;
+  stateMachine.checker.reset(); // freeze switching
+  document.getElementById('emerg-badge').className = 'badge badge-red';
+  document.getElementById('emerg-badge').textContent = 'ACTIVE';
+  document.getElementById('emerg-last').textContent = new Date().toLocaleTimeString();
+  document.getElementById('emerg-count').textContent = state.emergencyCount;
+  document.getElementById('emerg-avg').textContent = '~28s';
+  document.getElementById('emergency-banner').style.display = 'flex';
+  document.getElementById('emerg-banner-text').textContent =
+    `Emergency Vehicle Detected on ${stateMachine.greenLane} — Green Hold Active`;
+  addAlert(`🚨 EMERGENCY VEHICLE detected on ${stateMachine.greenLane} — signal locked GREEN`, 'danger');
+
+  setTimeout(() => {
+    state.emergencyActive = false;
+    document.getElementById('emerg-badge').className = 'badge badge-green';
+    document.getElementById('emerg-badge').textContent = 'CLEARED';
+    document.getElementById('emergency-banner').style.display = 'none';
+    addAlert('✅ Emergency vehicle has passed — normal signal cycle resuming', 'success');
+  }, 20000);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// SERVER-BACKED STREAM CONNECT
+// All live-stream traffic goes through server.py:
+//   POST /connect  — tells server to open the camera
+//   GET  /stream   — MJPEG proxy (no CORS issues)
+//   GET  /events   — SSE for real-time detection data
+// ═══════════════════════════════════════════════════════════════════
+
+let sseSource = null;   // EventSource handle
+
+function connectFeed() {
+  const url = document.getElementById('feed-url').value.trim();
+  if (!url) return;
+  attemptStreamConnect(url);
+}
+
+async function attemptStreamConnect(url) {
+  addAlert(`Connecting via server proxy: ${url}`, 'info');
+
+  // 1. Tell server.py to open the camera
+  let ok = false;
+  try {
+    const res = await fetch('/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+    const data = await res.json();
+    ok = data.ok;
+    if (!ok) { addAlert(`❌ Server error: ${data.error}`, 'danger'); return; }
+  } catch (e) {
+    // If server.py isn't running, fall back to direct MJPEG
+    addAlert('⚠ server.py not detected — trying direct connection', 'warn');
+    _directConnect(url);
+    return;
+  }
+
+  // 2. Point the <img> at /stream (server's MJPEG proxy)
+  _showStream('/stream', url);
+
+  // 3. Subscribe to /events (SSE) for detection data
+  _connectSSE();
+}
+
+function _showStream(mjpegSrc, label) {
+  const placeholder = document.getElementById('feed-placeholder');
+  const img = document.getElementById('feed-img');
+  const feedInfo = document.getElementById('feed-info');
+
+  img.onload = () => {
+    placeholder.style.display = 'none';
+    img.style.display = 'block';
+    feedInfo.style.display = 'flex';
+    document.getElementById('feed-url-display').textContent = label;
+    state.streamConnected = true;
+    document.getElementById('stream-url-display').textContent = label;
+    if (document.getElementById('p-stream-display'))
+      document.getElementById('p-stream-display').textContent = label;
+    document.getElementById('drone-status').textContent = 'Drone Connected';
+    document.getElementById('drone-dot').style.background = 'var(--green)';
+    addAlert(`✅ Stream connected: ${label}`, 'success');
+  };
+  img.onerror = () => {
+    addAlert(`❌ Stream lost — check server.py and camera URL`, 'danger');
+    img.src = '';
+  };
+  img.src = mjpegSrc;
+}
+
+function _directConnect(url) {
+  // Fallback: point img directly at camera (works on same-network same-origin pages)
+  const img = document.getElementById('feed-img');
+  const placeholder = document.getElementById('feed-placeholder');
+  const feedInfo = document.getElementById('feed-info');
+  img.src = url;
+  img.onload = () => {
+    placeholder.style.display = 'none';
+    img.style.display = 'block';
+    feedInfo.style.display = 'flex';
+    document.getElementById('feed-url-display').textContent = url;
+    state.streamConnected = true;
+    addAlert(`✅ Direct stream connected: ${url}`, 'success');
+    if (!simInterval) startSim();
+  };
+  img.onerror = () => {
+    addAlert(`❌ Direct connection failed: ${url}`, 'danger');
+    img.src = '';
+  };
+}
+
+function _connectSSE() {
+  if (sseSource) { sseSource.close(); }
+  sseSource = new EventSource('/events');
+
+  sseSource.addEventListener('status', e => {
+    const d = JSON.parse(e.data);
+    if (!d.connected) addAlert(d.msg, 'warn');
+  });
+
+  sseSource.addEventListener('fps', e => {
+    const d = JSON.parse(e.data);
+    const el = document.getElementById('feed-det-info');
+    if (el) el.textContent = `${d.fps} fps · detecting`;
+  });
+
+  sseSource.addEventListener('detection', e => {
+    const d = JSON.parse(e.data);
+    applyDetectionData(d);
+  });
+
+  sseSource.addEventListener('config', e => {
+    // Server confirmed config change — could refresh sliders here
+  });
+
+  sseSource.onerror = () => {
+    // SSE reconnects automatically; just note it
+  };
+}
+
+function applyDetectionData(d) {
+  // d = { rawCount, stoppedCount, smoothed, vehicleTypes, tracks, boxes }
+  const sig = stateMachine;
+  const activeLane = state.lanes[sig.idx];
+
+  activeLane.vehicles = d.rawCount;
+  activeLane.cumulative += d.rawCount;
+  state.stoppedVehicles = d.stoppedCount;
+  state.smoothedCount   = d.smoothed;
+  state.totalVehicles  += d.rawCount;
+
+  if (d.vehicleTypes) Object.assign(state.vehicleTypes, d.vehicleTypes);
+  if (d.tracks) {
+    state.trackedVehicles = d.tracks;
+  }
+
+  // Feed signal machine
+  const now = Date.now() / 1000;
+  sig.update(d.smoothed, d.stoppedCount, now, state.emergencyActive);
+
+  // Simulate line counter (count new arrivals as line crossings)
+  if (d.rawCount > 0) {
+    state.lineIn  += Math.round(d.rawCount * 0.6);
+    state.lineOut += Math.round(d.rawCount * 0.4);
+  }
+
+  // Draw bounding boxes on overlay
+  if (d.boxes) drawBoxes(d.boxes);
+
+  renderLanes();
+  renderStats();
+  renderVehicleTypes();
+  renderTrackerTable();
+}
+
+function drawBoxes(boxes) {
+  const overlay = document.getElementById('det-overlay');
+  if (!overlay) return;
+  // Remove old boxes (keep the line div)
+  overlay.querySelectorAll('.det-box').forEach(el => el.remove());
+
+  boxes.forEach(b => {
+    const div = document.createElement('div');
+    div.className = 'det-box' + (b.stopped ? ' stopped' : '');
+    div.style.left   = (b.x * 100) + '%';
+    div.style.top    = (b.y * 100) + '%';
+    div.style.width  = (b.w * 100) + '%';
+    div.style.height = (b.h * 100) + '%';
+
+    const label = document.createElement('div');
+    label.className = 'det-label';
+    label.textContent = b.label;
+    div.appendChild(label);
+    overlay.appendChild(div);
+  });
+}
+
+async function disconnectFeed() {
+  // Tell server to stop
+  try { await fetch('/disconnect', { method: 'POST' }); } catch(e) {}
+
+  if (sseSource) { sseSource.close(); sseSource = null; }
+
+  const img = document.getElementById('feed-img');
+  const video = document.getElementById('feed-video');
+  img.src = ''; img.style.display = 'none';
+  video.pause(); video.src = ''; video.style.display = 'none';
+  document.getElementById('feed-info').style.display = 'none';
+  document.getElementById('feed-placeholder').style.display = 'flex';
+  state.streamConnected = false;
+  document.getElementById('drone-status').textContent = 'Drone Online';
+  document.getElementById('drone-dot').style.background = 'var(--red)';
+  addAlert('Feed disconnected', 'warn');
+}
+
+function switchFeedTab(tab) {
+  document.getElementById('feed-tab-stream').classList.toggle('active', tab === 'stream');
+  document.getElementById('feed-tab-mp4').classList.toggle('active', tab === 'mp4');
+  document.getElementById('feed-stream-input').style.display = tab === 'stream' ? 'block' : 'none';
+  document.getElementById('feed-mp4-input').style.display = tab === 'mp4' ? 'block' : 'none';
+}
+
+function loadMP4(input) {
+  const file = input.files[0]; if (!file) return;
+  const url = URL.createObjectURL(file);
+  const video = document.getElementById('feed-video');
+  video.src = url; video.style.display = 'block';
+  document.getElementById('feed-placeholder').style.display = 'none';
+  document.getElementById('feed-info').style.display = 'flex';
+  document.getElementById('feed-url-display').textContent = '🎬 ' + file.name;
+  video.play();
+  state.streamConnected = true;
+  addAlert(`MP4 loaded: ${file.name} — detection simulation started`, 'success');
+  document.getElementById('feed-img').style.display = 'none';
+  if (!simInterval) startSim();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// VEHICLE DETECTION TAB
+// ═══════════════════════════════════════════════════════════════════
+function setVMode(mode) {
+  ['live','upload','demo'].forEach(m => {
+    document.getElementById(`vmode-${m}`).classList.remove('active');
+    document.getElementById(`vmode-${m}-content`).style.display = 'none';
+  });
+  document.getElementById(`vmode-${mode}`).classList.add('active');
+  document.getElementById(`vmode-${mode}-content`).style.display = 'block';
+}
+
+function switchVUploadTab(tab) {
+  document.getElementById('vup-tab-img').classList.toggle('active', tab === 'img');
+  document.getElementById('vup-tab-mp4').classList.toggle('active', tab === 'mp4');
+  document.getElementById('vup-img-content').style.display = tab === 'img' ? 'block' : 'none';
+  document.getElementById('vup-mp4-content').style.display = tab === 'mp4' ? 'block' : 'none';
+}
+
+function handleVehicleImageUpload(input) {
+  const file = input.files[0]; if (!file) return;
+  const url = URL.createObjectURL(file);
+  const preview = document.getElementById('vehicle-img-preview');
+  document.getElementById('vehicle-preview-img').src = url;
+  preview.style.display = 'block';
+  addAlert(`Image uploaded: ${file.name} — simulating YOLOv8x detection`, 'info');
+
+  // Simulate detection results after brief delay
+  setTimeout(() => {
+    const detections = generateFakeDetections();
+    const results = document.getElementById('vehicle-img-results');
+    results.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Detection results (yolov8x.pt, conf='+CFG.CONFIDENCE+'):</div>'
+      + detections.map(d => `
+        <div class="detection-result">
+          <span class="detection-name">${d.icon} ${d.label} #${d.id}</span>
+          <div class="detection-conf-bar"><div class="detection-conf-fill" style="width:${d.conf}%;background:${d.color};"></div></div>
+          <span class="detection-pct" style="color:${d.color};">${d.conf}%</span>
+        </div>`).join('');
+    Object.assign(state.vehicleTypes, detections.reduce((acc, d) => {
+      acc[d.key] = (acc[d.key] || 0) + 1; return acc;
+    }, {}));
+    renderVehicleTypes();
+    addAlert(`Detection complete: ${detections.length} vehicles found`, 'success');
+  }, 800);
+}
+
+function generateFakeDetections() {
+  const types = [
+    { key:'car', label:'Car', icon:'🚗', color:'var(--blue)' },
+    { key:'motorcycle', label:'Motorcycle', icon:'🏍', color:'var(--cyan)' },
+    { key:'bus', label:'Bus', icon:'🚌', color:'var(--green)' },
+    { key:'truck', label:'Truck', icon:'🚛', color:'var(--yellow)' },
+  ];
+  const count = 3 + Math.floor(Math.random() * 6);
+  return Array.from({length: count}, (_, i) => {
+    const t = types[Math.floor(Math.random() * types.length)];
+    return { ...t, id: i+1, conf: Math.round((60 + Math.random()*35) * 10) / 10 };
+  });
+}
+
+function handleVehicleMP4(input) {
+  const file = input.files[0]; if (!file) return;
+  const url = URL.createObjectURL(file);
+  const player = document.getElementById('vehicle-mp4-player');
+  player.src = url;
+  document.getElementById('vehicle-mp4-preview').style.display = 'block';
+  document.getElementById('vehicle-mp4-name').textContent = `${file.name} · ${(file.size/(1024*1024)).toFixed(1)} MB · Simulating detection...`;
+  player.play();
+  addAlert(`Vehicle MP4 loaded: ${file.name}`, 'info');
+  setTimeout(() => runDemoScenario('heavy'), 1200);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// POTHOLE DETECTION — pothole.pt (yolov8_custom.py)
+// ═══════════════════════════════════════════════════════════════════
+function setPMode(mode) {
+  ['stream','image','mp4','demo'].forEach(m => {
+    document.getElementById(`pmode-${m}`)?.classList.remove('active');
+    const el = document.getElementById(`pmode-${m}-content`);
+    if (el) el.style.display = 'none';
+  });
+  document.getElementById(`pmode-${mode}`)?.classList.add('active');
+  const cont = document.getElementById(`pmode-${mode}-content`);
+  if (cont) cont.style.display = 'block';
+}
+
+function runPotholeDemo() {
+  const locations = ['N-Approach','E-Approach','S-Approach','W-Approach'];
+  const sevList = [
+    { sev:'High', sevColor:'var(--red)', sevBg:'var(--red-dim)' },
+    { sev:'Medium', sevColor:'var(--yellow)', sevBg:'var(--yellow-dim)' },
+    { sev:'Low', sevColor:'var(--green)', sevBg:'var(--green-dim)' },
+  ];
+  const count = 3 + Math.floor(Math.random() * 5);
+  state.potholes = Array.from({length: count}, (_, i) => {
+    const sev = sevList[i < 2 ? 0 : i < count-1 ? 1 : 2];
+    return {
+      id: 'PH-' + String(i+1).padStart(3,'0'),
+      loc: locations[i % 4] + ' ' + (3 + Math.floor(Math.random()*20)) + 'm',
+      conf: Math.round(55 + Math.random() * 40),
+      ...sev,
+    };
+  });
+  renderPotholes();
+  document.getElementById('p-total').textContent = state.potholes.length;
+  document.getElementById('p-high').textContent = state.potholes.filter(p => p.sev === 'High').length;
+  document.getElementById('p-med').textContent = state.potholes.filter(p => p.sev === 'Medium').length;
+  document.getElementById('p-low').textContent = state.potholes.filter(p => p.sev === 'Low').length;
+  addAlert(`Pothole scan complete (pothole.pt, conf=${CFG.CONFIDENCE}) — ${state.potholes.length} detected`, 'warn');
+}
+
+function renderPotholes() {
+  const grid = document.getElementById('pothole-grid');
+  if (!state.potholes.length) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:12px;padding:24px 0;">No potholes detected yet.</div>';
+    return;
+  }
+  grid.innerHTML = state.potholes.map(p => `
+    <div class="pothole-card">
+      <div class="pothole-loc">${p.id}</div>
+      <div class="pothole-conf" style="color:var(--muted);">${p.loc} · ${p.conf}% conf</div>
+      <span class="pothole-sev" style="background:${p.sevBg};color:${p.sevColor};">${p.sev}</span>
+    </div>`).join('');
+}
+
+function handlePotholeImage(input) {
+  const file = input.files[0]; if (!file) return;
+  const resultsBox = document.getElementById('pothole-img-results');
+  resultsBox.classList.add('visible');
+  addAlert(`Pothole image uploaded: ${file.name} — running pothole.pt inference`, 'info');
+  setTimeout(() => {
+    const pCount = 1 + Math.floor(Math.random() * 4);
+    const sizes = ['large','medium','small','crack'];
+    document.getElementById('pothole-result-list').innerHTML =
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Detection results (pothole.pt, conf='+CFG.CONFIDENCE+'):</div>' +
+      Array.from({length: pCount}, (_, i) => {
+        const conf = Math.round(55 + Math.random() * 40);
+        return `<div class="detection-result">
+          <span class="detection-name">🕳 Pothole (${sizes[i%4]})</span>
+          <div class="detection-conf-bar"><div class="detection-conf-fill" style="width:${conf}%;"></div></div>
+          <span class="detection-pct">${conf}%</span>
+        </div>`;
+      }).join('');
+    addAlert(`Pothole detection complete: ${pCount} found`, 'warn');
+  }, 700);
+}
+
+function handlePotholeMP4(input) {
+  const file = input.files[0]; if (!file) return;
+  const url = URL.createObjectURL(file);
+  const player = document.getElementById('pothole-mp4-player');
+  player.src = url;
+  document.getElementById('pothole-mp4-preview').style.display = 'block';
+  document.getElementById('pothole-mp4-name').textContent = `${file.name} · ${(file.size/(1024*1024)).toFixed(1)} MB · Scanning for potholes...`;
+  player.play();
+  addAlert(`Pothole MP4 loaded: ${file.name} — running scan`, 'info');
+  setTimeout(() => {
+    runPotholeDemo();
+    document.getElementById('pothole-mp4-name').textContent = `${file.name} · Scan complete — see results above`;
+  }, 2000);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════════
+function updateCfg(key, val, suffix) {
+  document.getElementById(`cfg-${key}-val`).textContent = val + suffix;
+  const numVal = parseFloat(val);
+  // Apply config changes to live engine
+  if (key === 'min-green') { CFG.MIN_GREEN_SECONDS = numVal; document.getElementById('sm-min-green').textContent = val+'s'; }
+  if (key === 'max-green') { CFG.MAX_GREEN_SECONDS = numVal; document.getElementById('sm-max-green').textContent = val+'s'; }
+  if (key === 'yellow') CFG.YELLOW_SECONDS = numVal;
+  if (key === 'low-thresh') { CFG.LOW_TRAFFIC_THRESHOLD = numVal; document.getElementById('cfg-display-jam-ratio') && (document.getElementById('cfg-display-jam-ratio').textContent = document.getElementById('cfg-jam-ratio')?.value || 75); }
+  if (key === 'low-seconds') CFG.LOW_TRAFFIC_SECONDS = numVal;
+  if (key === 'jam-ratio') {
+    CFG.JAM_STOPPED_RATIO = numVal / 100;
+    const pct = document.getElementById('jam-thresh-label');
+    if (pct) pct.textContent = val + '% threshold';
+    document.getElementById('cfg-display-jam-ratio').textContent = val;
+  }
+  if (key === 'jam-seconds') { CFG.JAM_SECONDS = numVal; document.getElementById('cfg-display-jam-sec').textContent = val; }
+  if (key === 'rolling') { CFG.ROLLING_WINDOW_FRAMES = numVal; rollingCounter.window = numVal; }
+  if (key === 'conf') {
+    CFG.CONFIDENCE = numVal / 100;
+    document.getElementById('conf-display-val').textContent = val + '%';
+    document.getElementById('p-conf-display').textContent = val + '%';
+  }
+  if (key === 'stopped-px') {
+    CFG.STOPPED_DISPLACEMENT_PX = numVal;
+    const d = document.getElementById('stopped-px-display');
+    if (d) d.textContent = val;
+  }
+}
+
+function syncStreamUrl(url) {
+  document.getElementById('modal-stream-url').value = url;
+  document.getElementById('feed-url').value = url;
+}
+
+function saveConfig() {
+  // Push current CFG values to server.py
+  const payload = {
+    VIDEO_PATH:              document.getElementById('cfg-stream-url')?.value || CFG.VIDEO_PATH,
+    VEHICLE_MODEL_PATH:      document.getElementById('cfg-vehicle-model')?.value || CFG.VEHICLE_MODEL_PATH,
+    POTHOLE_MODEL_PATH:      document.getElementById('cfg-pothole-model')?.value || CFG.POTHOLE_MODEL_PATH,
+    CONFIDENCE:              CFG.CONFIDENCE,
+    MIN_GREEN_SECONDS:       CFG.MIN_GREEN_SECONDS,
+    MAX_GREEN_SECONDS:       CFG.MAX_GREEN_SECONDS,
+    YELLOW_SECONDS:          CFG.YELLOW_SECONDS,
+    LOW_TRAFFIC_THRESHOLD:   CFG.LOW_TRAFFIC_THRESHOLD,
+    LOW_TRAFFIC_SECONDS:     CFG.LOW_TRAFFIC_SECONDS,
+    JAM_STOPPED_RATIO:       CFG.JAM_STOPPED_RATIO,
+    JAM_SECONDS:             CFG.JAM_SECONDS,
+    ROLLING_WINDOW_FRAMES:   CFG.ROLLING_WINDOW_FRAMES,
+    STOPPED_DISPLACEMENT_PX: CFG.STOPPED_DISPLACEMENT_PX,
+  };
+  fetch('/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.ok) addAlert('✅ Configuration saved and applied to server', 'success');
+    else      addAlert('⚠ Config saved locally only (server not running)', 'warn');
+  })
+  .catch(() => addAlert('Config saved locally — server not reachable', 'warn'));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════════════════════════════
+function openConnectModal() {
+  document.getElementById('connect-modal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('connect-modal').classList.remove('open');
+}
+function connectFromModal() {
+  const url = document.getElementById('modal-stream-url').value.trim();
+  if (url) {
+    document.getElementById('feed-url').value = url;
+    if (document.getElementById('cfg-stream-url'))
+      document.getElementById('cfg-stream-url').value = url;
+    attemptStreamConnect(url);
+  }
+  closeModal();
+}
+document.getElementById('connect-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// PERIODIC RENDER (for countdown timers even when sim is paused)
+// ═══════════════════════════════════════════════════════════════════
+setInterval(() => {
+  if (!state.simRunning) { renderLanes(); renderStats(); }
+}, 500);
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+renderLanes();
+renderStats();
+renderVehicleTypes();
+renderPotholes();
+renderTrackerTable();
+addAlert('AeroSignal initialized — state machine ready', 'info');
+addAlert('All yolov8_ip.py + yolov8_custom.py logic integrated', 'success');
+addAlert('Connect a stream or run a demo to begin', 'info');
+</script>
+</body>
+</html>
